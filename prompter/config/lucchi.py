@@ -25,7 +25,7 @@ data = dict(
         dict(type='RandomCrop', height=768, width=1024, p=1),
         dict(type='RandomGridShuffle', grid=(4, 4), p=0.5),
         dict(type='ColorJitter', brightness=0.25, contrast=0.25, saturation=0.1, hue=0.05, p=0.2),
-        dict(type='RandomRotate90', p=0.5),
+        #dict(type='RandomRotate90', p=0.5),
         dict(type='Downscale', scale_max=0.5, scale_min=0.5, p=0.15),
          dict(type='Blur', blur_limit=10, p=0.2),
         dict(type='GaussNoise', var_limit=50, p=0.25),
