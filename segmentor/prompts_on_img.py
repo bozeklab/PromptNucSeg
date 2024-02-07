@@ -1,21 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
+test_path_raw = 'datasets/lucchi/test/raw/'
+prompt_path = 'prompts/lucchi/'
+to_save = 'prompts/visual/lucchi/'
+os.makedirs(to_save, exist_ok=True)
 
-image_names = ['2_' + str(i) for i in range(30)] + ['3_' + str(i) for i in range(30)]
-for image_name in image_names:
-    im = plt.imread('datasets/pannuke/Images/' + image_name + '.png')
-    implot = plt.imshow(im)
+for file in os.listdir(test_path_raw):
+    print(test_path_raw + file)
+    if file[-3:] != 'png':
+        continue
 
-    a = np.load('prompts/pannuke123/' + image_name + '.npy')
+    im = plt.imread(test_path_raw + file)
+    implot = plt.imshow(im, cmap='gray')
 
-    #print(a)
-    print(a.shape)
+    a = np.load(prompt_path + file[:-4] + '.npy')
 
     categories = a[:, 2]
-    colormap = np.array(['green', 'blue', 'red', 'brown'])
+    colormap = np.array(['red', 'blue', 'green', 'brown'])
 
     plt.scatter(a[:, 0], a[:, 1], s=50, c=colormap[categories.astype(int)])
-    plt.savefig('prompts/visual/new_repo/' + image_name + '.png')
+    plt.savefig(to_save + file)
     plt.clf()
 

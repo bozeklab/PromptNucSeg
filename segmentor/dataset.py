@@ -9,6 +9,9 @@ import albumentations as A
 from skimage import io
 from torch.utils.data import Dataset
 from albumentations.pytorch import ToTensorV2
+import re
+import cv2 as cv
+from PIL import Image
 
 
 class DataFolder(Dataset):
@@ -56,10 +59,19 @@ class DataFolder(Dataset):
             mask_path = '/'.join(sub_paths)
         elif self.dataset == 'cpm17':
             mask_path = f'{img_path[:-4].replace("Images", "Labels")}.mat'
+        elif self.dataset == 'lucchi':
+            mask_path = img_path
         else:
             mask_path = f'{img_path[:-4].replace("Images", "Masks")}.npy'
 
-        img, mask = io.imread(img_path)[..., :3], load_maskfile(mask_path)
+        if self.dataset == 'lucchi':
+            pattern = re.compile(r'(/mask/)')
+            raw_path = re.sub(pattern, r'/raw/', img_path)
+            img = io.imread(raw_path)
+            img = cv.merge((img, img, img))
+            mask = load_maskfile(mask_path)
+        else:
+            img, mask = io.imread(img_path)[..., :3], load_maskfile(mask_path)
 
         if self.mode != 'train':
             res = self.transform(image=img)
@@ -157,6 +169,9 @@ def load_maskfile(mask_path: str):
         inst_map = scipy.io.loadmat(mask_path)['inst_map']
         type_map = (inst_map.copy() > 0).astype(float)
 
+    elif 'lucchi' in mask_path:
+        inst_map = np.asarray(Image.open(mask_path))
+        type_map = (inst_map.copy() > 0).astype(float)
     else:
         inst_map = np.load(mask_path)
         type_map = (inst_map.copy() > 0).astype(float)

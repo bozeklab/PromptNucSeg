@@ -18,9 +18,10 @@ from stats_utils import (
     get_fast_pq,
     get_fast_aji
 )
-
+import os
 import argparse
 
+os.environ["WANDB__SERVICE_WAIT"] = "300"
 
 def parse_args():
     parser = argparse.ArgumentParser('Cell segmentor')
@@ -33,7 +34,7 @@ def parse_args():
     parser.add_argument("--start-epoch", default=0, type=int, metavar="N", help="start epoch")
     parser.add_argument('--epochs', default=200, type=int)
     parser.add_argument("--print-freq", default=10, type=int, help="print frequency")
-    parser.add_argument("--start-eval", default=60, type=int)
+    parser.add_argument("--start-eval", default=190, type=int)
 
     parser.add_argument('--output_dir', default='', type=str)
     parser.add_argument('--seed', default=42, type=int)
@@ -548,6 +549,8 @@ def evaluate(
                     all_classes.append(mask_data['categories'])
 
                     all_inds.append(mask_data['inds'])
+
+
 
             model_time = time.time() - model_time
             metric_logger.update(model_time=model_time)
