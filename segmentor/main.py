@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument('--config', default='pannuke123.py', help='config file')
     parser.add_argument('--resume', default='', type=str, help='resume from checkpoint')
     parser.add_argument("--eval", action='store_true', help='only evaluate')
-    parser.add_argument("--overlap", default=64, type=int, help="overlapping pixels")
+    parser.add_argument("--overlap", default=320, type=int, help="overlapping pixels")
 
     parser.add_argument("--start-epoch", default=0, type=int, metavar="N", help="start epoch")
     parser.add_argument('--epochs', default=200, type=int)
@@ -62,7 +62,6 @@ def main():
     init_distributed_mode(args)
     set_seed(args)
 
-    print(args)
 
     cfg = Config.fromfile(f'config/{args.config}')
     if args.output_dir:
@@ -154,7 +153,7 @@ def main():
 
     if args.use_wandb and is_main_process():
         wandb.init(
-            project="Segmentor",
+            project="Segmentor 512 B",
             name=args.run_name,
             group=args.group_name,
             config=vars(args)
@@ -491,6 +490,7 @@ def evaluate(
 
             inds = torch.arange(len(prompt_points))
 
+            print(f"{len(crop_boxes)=}")
             for idx, crop_box in enumerate(crop_boxes):
                 x1, y1, x2, y2 = crop_box
 
@@ -529,6 +529,7 @@ def evaluate(
                 masks = inference(
                     model,
                     images[..., y1:y2, x1:x2],
+                    inst_maps[..., y1:y2, x1:x2],
                     crop_box,
                     ori_sizes[0],
                     sub_prompt_points,
@@ -562,28 +563,31 @@ def evaluate(
             unique_inds, counts = np.unique(all_inds, return_counts=True)
 
             # first-aspect NMS
-            keep_prior = np.ones(len(all_inds), dtype=bool)
-            for i in np.where(counts > 1)[0]:
-                inds = np.where(all_inds == unique_inds[i])[0]
-                inds = np.delete(inds, np.argmax(all_scores[inds]))
-                keep_prior[inds] = False
-            keep_prior = torch.from_numpy(keep_prior)
+            # keep_prior = np.ones(len(all_inds), dtype=bool)
+            # for i in np.where(counts > 1)[0]:
+            #     inds = np.where(all_inds == unique_inds[i])[0]
+            #     inds = np.delete(inds, np.argmax(all_scores[inds]))
+            #     keep_prior[inds] = False
+            # keep_prior = torch.from_numpy(keep_prior)
 
-            all_boxes = all_boxes[keep_prior]
-            all_scores = all_scores[keep_prior]
-            all_masks = [all_masks[ind] for ind in np.where(keep_prior)[0]]
+            # all_boxes = all_boxes[keep_prior]
+            # all_scores = all_scores[keep_prior]
+            # all_masks = [all_masks[ind] for ind in np.where(keep_prior)[0]]
 
             # second-aspect NMS
-            keep_by_nms = batched_nms(
-                all_boxes.float(),
-                all_scores,
-                torch.zeros_like(all_boxes[:, 0]),  # apply cross categories
-                iou_threshold=iou_threshold
-            ).numpy()
-            order = keep_by_nms[::-1]
+            # keep_by_nms = batched_nms(
+            #     all_boxes.float(),
+            #     all_scores,
+            #     torch.zeros(all_boxes.shape[0]),  # apply cross categories
+            #     iou_threshold=iou_threshold
+            # ).numpy()
+            # order = keep_by_nms[::-1]
             b_inst_map = np.zeros_like(inst_maps[0], dtype=int)
-            for iid, ind in enumerate(order):
-                b_inst_map[all_masks[ind]] = iid + 1
+            for mask in all_masks:
+                #TODO better way to merge mask, for now union
+                b_inst_map += mask
+            # for iid, ind in enumerate(order):
+            #     b_inst_map[all_masks[ind]] = iid + 1
 
             if len(np.unique(inst_maps[0])) == 1:
                 bpq_tmp = np.nan
@@ -592,7 +596,8 @@ def evaluate(
             else:
                 [bdq_tmp, bsq_tmp, bpq_tmp], _ = get_fast_pq(
                     remap_label(inst_maps[0]),
-                    remap_label(b_inst_map)
+                    remap_label(b_inst_map),
+                    i=data_iter_step
                 )
 
             aji_score = get_fast_aji(

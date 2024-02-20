@@ -3,6 +3,7 @@ import os
 import numpy as np
 import cv2 as cv
 from PIL import Image
+import re
 
 def mkdir(path):
     try:
@@ -10,6 +11,9 @@ def mkdir(path):
     except OSError as e:
         return
 
+def sort_key(path):
+    match = re.search(r'\d+', path)
+    return int(match.group()) if match else 0
 
 train_anno = {'classes': ['mito']}
 test_anno = {'classes': ['mito']}
@@ -49,8 +53,8 @@ for root, _, files in os.walk('.'):
             else:
                 test_anno[f'datasets/lucchi/test/mask/{file}'] = points
 
-np.save('../lucchi_train_files.npy', list(train_anno.keys())[1:])
-np.save('../lucchi_test_files.npy', list(test_anno.keys())[1:])
+np.save('../lucchi_train_files.npy', sorted(list(train_anno.keys())[1:], key=sort_key))
+np.save('../lucchi_test_files.npy', sorted(list(test_anno.keys())[1:], key=sort_key))
 
 mkdir('../../../prompter/datasets/lucchi')
 json.dump(train_anno, open('../../../prompter/datasets/lucchi/train.json', 'w'))
