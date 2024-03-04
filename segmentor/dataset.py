@@ -59,12 +59,12 @@ class DataFolder(Dataset):
             mask_path = '/'.join(sub_paths)
         elif self.dataset == 'cpm17':
             mask_path = f'{img_path[:-4].replace("Images", "Labels")}.mat'
-        elif self.dataset == 'lucchi':
+        elif self.dataset == 'lucchi' or self.dataset == 'Lucchipp':
             mask_path = img_path
         else:
             mask_path = f'{img_path[:-4].replace("Images", "Masks")}.npy'
 
-        if self.dataset == 'lucchi':
+        if self.dataset == 'lucchi'  or self.dataset == 'Lucchipp':
             pattern = re.compile(r'(/mask/)')
             raw_path = re.sub(pattern, r'/raw/', img_path)
             img = io.imread(raw_path)
@@ -169,7 +169,7 @@ def load_maskfile(mask_path: str):
         inst_map = scipy.io.loadmat(mask_path)['inst_map']
         type_map = (inst_map.copy() > 0).astype(float)
 
-    elif 'lucchi' in mask_path:
+    elif 'lucchi' or 'Lucchipp' in mask_path:
         inst_map = np.asarray(Image.open(mask_path))
         type_map = (inst_map.copy() > 0).astype(float)
     else:

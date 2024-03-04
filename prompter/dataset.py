@@ -63,7 +63,7 @@ class DataFolder(Dataset):
             raw_path = raw_path[:-3] + 'png'
 
         np_img = []
-        if self.dataset == 'lucchi':
+        if self.dataset == 'lucchi' or self.dataset == 'Lucchipp':
             np_img = io.imread(f'../segmentor/{raw_path}')
             np_img = [cv.merge((np_img, np_img, np_img))]
         else:
@@ -81,7 +81,7 @@ class DataFolder(Dataset):
             mask = np.load(f'../segmentor/{mask_path}')
         elif self.dataset == 'cpm17':
             mask = scipy.io.loadmat(f'../segmentor/{img_path[:-4].replace("Images", "Labels")}.mat')['inst_map']
-        elif self.dataset == 'lucchi':
+        elif self.dataset == 'lucchi' or self.dataset == 'Lucchipp':
             mask = np.asarray(Image.open(f'../segmentor/{img_path}'))
         else:
             mask = np.load(f'../segmentor/{img_path.replace("Images", "Masks")[:-4]}.npy', allow_pickle=True)[()][

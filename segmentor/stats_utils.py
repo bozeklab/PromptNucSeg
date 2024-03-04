@@ -173,18 +173,23 @@ def get_fast_aji_plus(true, pred):
     aji_score = overall_inter / overall_union
     return aji_score
 
+from PIL import Image
+def save_two_masks(gt_mask, pred_mask, in_pq_path, prompt_path, save_mask_path):
+    #TODO use args to generate raw masks
 
-def save_two_masks(gt_mask, pred_mask, path, prompt_path):
+
+    img = Image.fromarray((pred_mask * 255).astype(np.uint8), mode='L')
+    img.save(save_mask_path)
 
     prompts = np.load(prompt_path)
-    categories = a[:, 2]
-    colormap = np.array(['red', 'blue', 'green', 'brown'])
+    categories = prompts[:, 2]
+    colormap = np.array(['blue', 'green', 'brown'])
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
     # Plot the first mask
     axes[0].imshow(gt_mask, cmap='gray')
     axes[0].set_title('Mask GT')
-    axes[0].scatter(a[:, 0], a[:, 1], s=30, c=colormap[categories.astype(int)])
+    axes[0].scatter(prompts[:, 0], prompts[:, 1], s=30, c=colormap[categories.astype(int)])
 
     #print(np.unique(pred_mask))
     cp = pred_mask
@@ -197,10 +202,10 @@ def save_two_masks(gt_mask, pred_mask, path, prompt_path):
     plt.tight_layout()
 
     # Save the figure
-    plt.savefig(path)
+    plt.savefig(in_pq_path)
 
 #####
-def get_fast_pq(true, pred, match_iou=0.5, i=999):
+def get_fast_pq(true, pred, match_iou=0.5, i=999, args=None):
     """`match_iou` is the IoU threshold level to determine the pairing between
     GT instances `p` and prediction instances `g`. `p` and `g` is a pair
     if IoU > `match_iou`. However, pair of `p` and `g` must be unique 
@@ -226,7 +231,8 @@ def get_fast_pq(true, pred, match_iou=0.5, i=999):
     assert match_iou >= 0.0, "Cant' be negative"
 
     pred = pred > 0
-    save_two_masks(true, pred, f'results/in_pq/{i}.png', f'prompts/lucchi/{i}.npy')
+    save_two_masks(true, pred, f'results/in_pq/{i}.png', f'prompts/Lucchipp/{i}.npy',
+                   f'results/masks/{i}.png')
 
     true = np.copy(true)
     pred = np.copy(pred)

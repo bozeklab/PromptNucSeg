@@ -46,7 +46,7 @@ def process_files(files):
         if raw_path[-3:] == 'mat':
             raw_path = raw_path[:-3] + 'png'
 
-        if dataset == 'lucchi':
+        if dataset == 'lucchi' or dataset == 'Lucchipp':
             img = io.imread(f'../segmentor/{raw_path}')
             img = cv.merge((img, img, img))
         else:

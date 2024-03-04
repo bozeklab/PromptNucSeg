@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument("--start-epoch", default=0, type=int, metavar="N", help="start epoch")
     parser.add_argument('--epochs', default=200, type=int)
     parser.add_argument("--print-freq", default=10, type=int, help="print frequency")
-    parser.add_argument("--start-eval", default=190, type=int)
+    parser.add_argument("--start-eval", default=2000, type=int)
 
     parser.add_argument('--output_dir', default='', type=str)
     parser.add_argument('--seed', default=42, type=int)
@@ -256,9 +256,15 @@ def train_on_epoch(
         images = images.to(device)
         true_masks = true_masks.to(device)
 
+        prompt_points = prompt_points.reshape(1, prompt_points.shape[0], 2)
+        prompt_labels = prompt_labels.reshape(1, prompt_labels.shape[0])
+
         prompt_points = prompt_points.to(device)
         prompt_labels = prompt_labels.to(device)
 
+
+
+        #print(f'{prompt_points=}')
         cell_nums = cell_nums.to(device)
 
         outputs = model(
@@ -490,7 +496,7 @@ def evaluate(
 
             inds = torch.arange(len(prompt_points))
 
-            print(f"{len(crop_boxes)=}")
+            #print(f"{len(crop_boxes)=}")
             for idx, crop_box in enumerate(crop_boxes):
                 x1, y1, x2, y2 = crop_box
 
@@ -589,6 +595,7 @@ def evaluate(
             # for iid, ind in enumerate(order):
             #     b_inst_map[all_masks[ind]] = iid + 1
 
+
             if len(np.unique(inst_maps[0])) == 1:
                 bpq_tmp = np.nan
                 bdq_tmp = np.nan
@@ -597,7 +604,8 @@ def evaluate(
                 [bdq_tmp, bsq_tmp, bpq_tmp], _ = get_fast_pq(
                     remap_label(inst_maps[0]),
                     remap_label(b_inst_map),
-                    i=data_iter_step
+                    i=data_iter_step,
+                    args=args
                 )
 
             aji_score = get_fast_aji(
