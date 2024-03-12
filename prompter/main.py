@@ -43,6 +43,8 @@ def parse_args():
         "--model-ema", action="store_true", help="enable tracking Exponential Moving Average of model parameters"
     )
 
+    parser.add_argument("--start-eval", default=100, type=int)
+
     parser.add_argument(
         "--model-ema-steps",
         type=int,
@@ -235,7 +237,7 @@ def main():
                             checkpoint,
                             f"checkpoint/{args.output_dir}/best.pth",
                         )
-        except NameError:
+        except AttributeError:
             pass
 
         if is_main_process() and args.use_wandb:

@@ -621,6 +621,7 @@ def evaluate(
                     np.nanmean(np.concatenate(tmp), axis=1)
                 ))
 
+        print(f'{tissue_mpq_scores=}')
         tissue_mPQ = np.nanmean(tissue_mpq_scores)
 
         tissue_bpq_scores = []

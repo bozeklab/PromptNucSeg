@@ -49,7 +49,8 @@ def remap_label(pred, by_size=False):
 mkdir('Images')
 mkdir('Masks')
 
-for i in range(1, 4):
+for i in range(4, 4):
+    print(i)
 
     images = np.load(f'Fold {i}/images/fold{i}/images.npy')
     masks = np.load(f'Fold {i}/masks/fold{i}/masks.npy')
@@ -84,7 +85,8 @@ mkdir('../../../prompter/datasets/pannuke321')
 
 num_classes = 5
 
-for i in range(1, 4):
+for i in range(3, 4):
+    print(i)
     data = {
         'classes': ["Neoplastic", "Inflammatory", "Connective", "Dead", "Epithelial"]
     }
