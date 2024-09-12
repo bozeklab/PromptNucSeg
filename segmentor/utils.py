@@ -15,6 +15,10 @@ from collections import defaultdict, deque
 from torchvision.transforms.functional import hflip, vflip
 from scipy.spatial.distance import directed_hausdorff as hausdorff
 
+import  albumentations as A
+IMG_SAVE = 0
+WHOLE = 0
+MAX_IMG = 50
 
 def train_collate_fn(batch):
     images, masks, prompt_points, prompt_labels, all_points, all_points_types, cell_nums = [[] for _ in range(7)]
@@ -465,7 +469,7 @@ def crop_with_overlap(
     ):
         points = [0]
         counter = 1
-        stride = 256 - overlap
+        stride = split_size - overlap
         while True:
             pt = stride * counter
             if pt + split_size >= size:
@@ -508,12 +512,75 @@ from segment_anything.utils.amg import (
 from torchvision.ops.boxes import batched_nms
 
 import torch.nn as nn
+from PIL import Image
+import matplotlib.pyplot as plt
 
+def save_two_masks(gt_mask, pred_mask, path):
+    gt_mask = np.array(gt_mask[0])
+    pred_mask = np.array(pred_mask)
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+    # Plot the first mask
+    axes[0].imshow(gt_mask, cmap='gray')
+    axes[0].set_title('Mask GT')
+
+    # Plot the second mask
+    axes[1].imshow(pred_mask, cmap='gray')
+    axes[1].set_title('Mask Pred')
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    # Save the figure
+    plt.savefig(path)
+
+
+def save_result_as_image(input_image, segmentation_result, output_path):
+    # Convert PyTorch tensor to numpy array
+    input_image_np = np.array(input_image.squeeze(0).permute(1, 2, 0).cpu())
+    # print(input_image_np.shape)
+    # print(input_image_np)
+    # TODO
+    inverse_transform = A.Compose([ A.Normalize(mean = [ 0., 0., 0. ],
+                                                     std = [ 1/0.229, 1/0.224, 1/0.225 ]),
+                                A.Normalize(mean = [ -0.485, -0.456, -0.406 ],
+                                                     std = [ 1., 1., 1. ]),
+                               ])
+    # Apply the inverse transformation
+    original_image = inverse_transform(image=input_image_np)['image']
+
+
+    # Ensure values are within the valid range (0 to 1 for normalized images)
+    #original_image = np.clip(original_image, 0, 1)
+
+    input_image_np = original_image
+    #print(input_image_np)
+
+    segmentation_result_np = np.array(segmentation_result.cpu())
+
+    # Convert segmentation result to a binary mask for visualization
+    segmentation_mask = (segmentation_result_np > 0).astype(np.uint8) * 122
+
+    im = Image.fromarray(segmentation_mask)
+    #im.save(output_path)
+
+
+    # Create an RGBA image with the input image and segmentation mask
+    merged_image = Image.new("RGB", input_image_np.shape[:2][::-1], (255, 255, 255, 0))
+    input_image_rgba = Image.fromarray((input_image_np * 255).astype(np.uint8))
+    segmentation_mask_rgba = Image.fromarray(segmentation_mask, "L")
+    merged_image.paste(input_image_rgba, (0, 0, input_image_rgba.width, input_image_rgba.height))
+    merged_image.paste(segmentation_mask_rgba, (0, 0, segmentation_mask_rgba.width, segmentation_mask_rgba.height), segmentation_mask_rgba)
+
+    # Save the merged image as PNG
+    merged_image.save(output_path, format="PNG")
 
 @torch.inference_mode()
 def inference(
         model: nn.Module,
         image: torch.Tensor,
+        inst_map: torch.Tensor,
         crop_box: np.ndarray,
         ori_size: tuple,
         prompt_points: torch.Tensor,
@@ -529,18 +596,29 @@ def inference(
         inds=None,
         tta=False
 ):
+    global IMG_SAVE, MAX_IMG, WHOLE
     orig_h, orig_w = ori_size
 
     # Generate masks for this crop in batches
     mask_data = MaskData()
     for (points, labels, cell_types, sub_inds) in batch_iterator(points_per_batch, prompt_points, prompt_labels,
                                                                  prompt_cell_types, inds):
+        points = points.reshape(1, points.shape[0], 2)
+        labels = labels.reshape(1, labels.shape[0])
+
+        # print((f'{image.shape=}'))
+        # print(f'{points.shape=}')
+        # print(f'{labels.shape=}')
+        # print(f'{torch.as_tensor([len(points)]).to(points.device)=}')
+
         outputs = model(
             image,
             points,
             labels,
             torch.as_tensor([len(points)]).to(points.device),
         )
+
+        # print(f'{outputs["pred_masks"].shape=}')
 
         if tta:  # used in FullNet and CDNet
 
@@ -688,6 +766,8 @@ def inference(
             masks = outputs["pred_masks"]
             iou_preds = outputs["pred_ious"]
 
+        #masks = masks[:1,:,:]
+
         # Serialize predictions and store in MaskData
         batch_data = MaskData(
             masks=masks,
@@ -703,6 +783,7 @@ def inference(
             keep_mask = batch_data["iou_preds"] > pred_iou_thresh
             batch_data.filter(keep_mask)
 
+
         # Calculate stability score
         batch_data["stability_score"] = calculate_stability_score(
             batch_data["masks"], mask_threshold, stability_score_offset
@@ -715,11 +796,22 @@ def inference(
         batch_data["masks"] = batch_data["masks"] > mask_threshold
         batch_data["boxes"] = batched_mask_to_box(batch_data["masks"])
 
+        # if IMG_SAVE < MAX_IMG:
+        #     # pass
+        #     save_two_masks(inst_map, batch_data["masks"][0], f'results/masks/{IMG_SAVE}.png')
+        #     save_result_as_image(image, outputs["pred_masks"][0],
+        #                         f'results/merged/{IMG_SAVE}.png')
+        # IMG_SAVE = IMG_SAVE + 1
+
+        #print(f'{keep_mask=}')
+
         # Filter boxes that touch crop boundaries
         keep_mask = ~is_box_near_crop_edge(batch_data["boxes"], crop_box, [0, 0, orig_w, orig_h], atol=7)
         # print(keep_mask.shape, batch_data["masks"].shape, batch_data["boxes"].shape)
-        if not torch.all(keep_mask):
-            batch_data.filter(keep_mask)
+        # if not torch.all(keep_mask):
+        #     batch_data.filter(keep_mask)
+
+        #print(f'{keep_mask=}')
 
         # Compress to RLE
         batch_data["masks"] = uncrop_masks(batch_data["masks"], crop_box, orig_h, orig_w)
@@ -753,6 +845,12 @@ def inference(
         )
 
     mask_data["segmentations"] = [rle_to_mask(rle) for rle in mask_data["rles"]]
+
+    for sgm in mask_data["segmentations"]:
+        if WHOLE < MAX_IMG:
+            pass
+            #save_two_masks(inst_map, sgm, f'results/whole/{WHOLE}.png')
+        WHOLE += 1
 
     # Write mask records
     curr_anns = []

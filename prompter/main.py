@@ -9,8 +9,10 @@ from models.dpa_p2pnet import build_model
 from engine import train_one_epoch, evaluate
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
+import os
 
 
+os.environ["WANDB__SERVICE_WAIT"] = "300"
 def parse_args():
     parser = argparse.ArgumentParser('Cell prompter')
     parser.add_argument('--config', default='pannuke123.py', type=str)

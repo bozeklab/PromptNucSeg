@@ -10,7 +10,9 @@ from skimage import io
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.distributed import DistributedSampler
-
+from PIL import Image
+import re
+import cv2 as cv
 
 def read_from_json(json_path):
     with open(json_path, 'r', encoding='utf-8') as f:
@@ -29,7 +31,6 @@ class DataFolder(Dataset):
         self.data = anno_json
         self.img_paths = list(anno_json.keys())
         self.keys = ['image', 'keypoints'] + [f'keypoints{i}' for i in range(1, cfg.data.num_classes)] + ['mask']
-
         self.phase = mode
         self.dataset = cfg.data.name
 
@@ -53,7 +54,23 @@ class DataFolder(Dataset):
 
         img_path = self.img_paths[index]
 
-        values = ([io.imread(f'../segmentor/{img_path}')[..., :3]] +
+        # Define the regex pattern to match the 'mask' part
+        pattern = re.compile(r'(/mask/)')
+        # Replace 'mask' with 'raw' in the path
+        raw_path = re.sub(pattern, r'/raw/', img_path)
+
+        if raw_path[-3:] == 'mat':
+            raw_path = raw_path[:-3] + 'png'
+
+        np_img = []
+        if self.dataset == 'lucchi' or self.dataset == 'Lucchipp':
+            np_img = io.imread(f'../segmentor/{raw_path}')
+            np_img = [cv.merge((np_img, np_img, np_img))]
+        else:
+            np_img = [io.imread(f'../segmentor/{raw_path}')[..., :3]]
+
+
+        values = (np_img +
                   [np.array(point).reshape(-1, 2) for point in self.data[img_path]])
 
         if self.dataset == 'kumar':
@@ -64,6 +81,8 @@ class DataFolder(Dataset):
             mask = np.load(f'../segmentor/{mask_path}')
         elif self.dataset == 'cpm17':
             mask = scipy.io.loadmat(f'../segmentor/{img_path[:-4].replace("Images", "Labels")}.mat')['inst_map']
+        elif self.dataset == 'lucchi' or self.dataset == 'Lucchipp':
+            mask = np.asarray(Image.open(f'../segmentor/{img_path}'))
         else:
             mask = np.load(f'../segmentor/{img_path.replace("Images", "Masks")[:-4]}.npy', allow_pickle=True)[()][
                         'inst_map']
@@ -73,6 +92,8 @@ class DataFolder(Dataset):
 
         ori_shape = values[0].shape[:2]
         sample = dict(zip(self.keys, values))
+        sample['keypoints'] = [tuple(k) for k in sample['keypoints']]
+
         res = self.transform(**sample)
         res = list(res.values())
 

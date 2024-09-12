@@ -9,6 +9,8 @@ from models.dpa_p2pnet import build_model
 
 from main import parse_args
 from mmengine.config import Config
+import re
+import cv2 as cv
 
 args = parse_args()
 cfg = Config.fromfile(f'config/{args.config}')
@@ -38,7 +40,17 @@ transform = A.Compose([
 
 def process_files(files):
     for file in tqdm(files):
-        img = io.imread(f'../segmentor/{file}')[..., :3]
+        pattern = re.compile(r'(/mask/)')
+        raw_path = re.sub(pattern, r'/raw/', file)
+
+        if raw_path[-3:] == 'mat':
+            raw_path = raw_path[:-3] + 'png'
+
+        if dataset == 'lucchi' or dataset == 'Lucchipp':
+            img = io.imread(f'../segmentor/{raw_path}')
+            img = cv.merge((img, img, img))
+        else:
+            img = io.imread(f'../segmentor/{raw_path}')[..., :3]
 
         image = transform(image=img)['image'].unsqueeze(0).to(device)
 
